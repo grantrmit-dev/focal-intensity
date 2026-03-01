@@ -185,6 +185,20 @@
             <option value="160">160 × 160 (slow)</option>
           </select>
         </div>
+        <div class="field">
+          <label>Colormap</label>
+          <select id="colormap">
+            <option value="Jet" selected>Jet</option>
+            <option value="Hot">Hot</option>
+            <option value="Viridis">Viridis</option>
+            <option value="Plasma">Plasma</option>
+            <option value="Inferno">Inferno</option>
+            <option value="Magma">Magma</option>
+            <option value="RdBu">RdBu</option>
+            <option value="Greys">Greys</option>
+            <option value="Rainbow">Rainbow</option>
+          </select>
+        </div>
       </div>
     </div>
 
@@ -264,12 +278,11 @@ async function init() {
 init();
 
 // ── Plot helper ───────────────────────────────────────────────────────────────
-const COLORSCALE = 'Jet';
-
 function renderHeatmap(elId, z2d, xArr, yArr, xLabel, yLabel) {
+  const colorscale = document.getElementById('colormap').value;
   const data = [{
     type: 'heatmap', z: z2d, x: xArr, y: yArr,
-    colorscale: COLORSCALE, showscale: true,
+    colorscale, showscale: true,
     colorbar: { thickness: 10, len: 0.8, tickfont: { size: 9, color: '#94a3b8' } }
   }];
   const layout = {
