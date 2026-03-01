@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Focal Intensity Calculator</title>
+  <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: Inter, Arial, sans-serif; }
+    body { background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+
+    header {
+      background: #1e293b;
+      padding: 16px 24px;
+      border-bottom: 1px solid #334155;
+      display: flex; align-items: center; gap: 12px;
+    }
+    header h1 { font-size: 1.2rem; font-weight: 600; color: #f1f5f9; }
+    header span { font-size: 0.8rem; color: #64748b; }
+
+    .layout { display: grid; grid-template-columns: 280px 1fr; gap: 0; height: calc(100vh - 57px); }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      background: #1e293b;
+      border-right: 1px solid #334155;
+      padding: 16px;
+      overflow-y: auto;
+      display: flex; flex-direction: column; gap: 14px;
+    }
+    .section-title {
+      font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
+      letter-spacing: .08em; color: #64748b; margin-bottom: 4px;
+    }
+    .field { display: flex; flex-direction: column; gap: 4px; }
+    .field label { font-size: 0.8rem; color: #94a3b8; }
+    .field input, .field select {
+      background: #0f172a; border: 1px solid #334155; border-radius: 6px;
+      color: #e2e8f0; padding: 7px 10px; font-size: 0.85rem; width: 100%;
+    }
+    .field input:focus, .field select:focus {
+      outline: none; border-color: #3b82f6;
+    }
+    .hint { font-size: 0.72rem; color: #475569; }
+
+    .btn-run {
+      width: 100%; padding: 10px; border-radius: 8px; border: none;
+      background: #3b82f6; color: #fff; font-size: 0.9rem; font-weight: 600;
+      cursor: pointer; transition: background .15s;
+    }
+    .btn-run:hover:not(:disabled) { background: #2563eb; }
+    .btn-run:disabled { background: #1e40af; cursor: not-allowed; opacity: .7; }
+
+    .status-bar {
+      font-size: 0.78rem; color: #64748b; text-align: center;
+      min-height: 18px;
+    }
+    .status-bar.error { color: #f87171; }
+    .status-bar.ok    { color: #4ade80; }
+
+    /* ── Main panel ── */
+    .main {
+      display: grid; grid-template-rows: 1fr auto;
+      background: #0f172a; overflow: hidden;
+    }
+    .plots {
+      display: grid; grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      gap: 2px; padding: 12px; overflow: auto;
+    }
+    .plot-box {
+      background: #1e293b; border-radius: 8px; overflow: hidden;
+      display: flex; flex-direction: column;
+    }
+    .plot-title {
+      font-size: 0.72rem; color: #94a3b8; padding: 6px 10px 2px;
+      font-weight: 600; letter-spacing: .04em;
+    }
+    .plot-el { flex: 1; min-height: 0; }
+
+    .loader {
+      position: fixed; inset: 0; background: rgba(15,23,42,.85);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 16px; z-index: 999;
+    }
+    .loader.hidden { display: none; }
+    .spinner {
+      width: 44px; height: 44px; border: 4px solid #334155;
+      border-top-color: #3b82f6; border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loader-msg { font-size: 0.9rem; color: #94a3b8; }
+
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+      .sidebar { height: auto; }
+      .plots { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Focal Intensity Calculator</h1>
+  <span>Vectorial Debye diffraction — high-NA objective</span>
+</header>
+
+<div class="layout">
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar">
+
+    <div>
+      <div class="section-title">Optical Parameters</div>
+      <div style="display:grid;gap:8px;">
+        <div class="field">
+          <label>Wavelength (nm)</label>
+          <input type="number" id="wl" value="800" min="200" max="2000" step="10" />
+        </div>
+        <div class="field">
+          <label>Numerical Aperture (NA)</label>
+          <input type="number" id="NA" value="1.4" min="0.1" max="2.0" step="0.05" />
+        </div>
+        <div class="field">
+          <label>Refractive Index (n)</label>
+          <input type="number" id="n" value="1.514" min="1.0" max="3.0" step="0.001" />
+          <span class="hint">Oil: 1.514 · Water: 1.33 · Air: 1.0</span>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-title">Beam Parameters</div>
+      <div style="display:grid;gap:8px;">
+        <div class="field">
+          <label>Polarisation</label>
+          <select id="polarization">
+            <option value="Linear">Linear</option>
+            <option value="Circular" selected>Circular</option>
+            <option value="Radial">Radial</option>
+            <option value="Azimuthal">Azimuthal</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Topological Charge (m)</label>
+          <input type="number" id="m" value="0" min="-5" max="5" step="1" />
+          <span class="hint">0 = plane wave</span>
+        </div>
+        <div class="field">
+          <label>Annular Aperture (ε, 0–1)</label>
+          <input type="number" id="e" value="0" min="0" max="0.99" step="0.05" />
+          <span class="hint">0 = full circular aperture</span>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-title">Calculation Region</div>
+      <div style="display:grid;gap:8px;">
+        <div class="field">
+          <label>Plane</label>
+          <select id="plane">
+            <option value="X-Y">X-Y (transverse)</option>
+            <option value="R-Z" selected>R-Z (axial)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>XY half-width (µm)</label>
+          <input type="number" id="r_extent" value="1.0" min="0.1" max="10" step="0.1" />
+        </div>
+        <div class="field">
+          <label>Z half-width (µm)</label>
+          <input type="number" id="z_extent" value="1.0" min="0.1" max="10" step="0.1" />
+        </div>
+        <div class="field">
+          <label>Z₀ image plane (µm)</label>
+          <input type="number" id="z0" value="0" min="-5" max="5" step="0.1" />
+        </div>
+        <div class="field">
+          <label>Resolution (pixels)</label>
+          <select id="re">
+            <option value="50">50 × 50 (fast)</option>
+            <option value="80" selected>80 × 80</option>
+            <option value="120">120 × 120</option>
+            <option value="160">160 × 160 (slow)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn-run" id="btnRun" disabled>Loading Python…</button>
+    <div class="status-bar" id="statusBar">Initialising Pyodide…</div>
+
+  </aside>
+
+  <!-- ── Main plots ── -->
+  <main class="main">
+    <div class="plots">
+      <div class="plot-box">
+        <div class="plot-title">Total Intensity  I</div>
+        <div class="plot-el" id="plotI"></div>
+      </div>
+      <div class="plot-box">
+        <div class="plot-title">I<sub>x</sub> Component</div>
+        <div class="plot-el" id="plotIx"></div>
+      </div>
+      <div class="plot-box">
+        <div class="plot-title">I<sub>y</sub> Component</div>
+        <div class="plot-el" id="plotIy"></div>
+      </div>
+      <div class="plot-box">
+        <div class="plot-title">I<sub>z</sub> Component</div>
+        <div class="plot-el" id="plotIz"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Loading overlay -->
+<div class="loader" id="loader">
+  <div class="spinner"></div>
+  <div class="loader-msg" id="loaderMsg">Loading Pyodide runtime…</div>
+</div>
+
+<script type="module">
+// ── Load Pyodide ──────────────────────────────────────────────────────────────
+import { loadPyodide } from 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.mjs';
+
+const statusBar = document.getElementById('statusBar');
+const btnRun    = document.getElementById('btnRun');
+const loader    = document.getElementById('loader');
+const loaderMsg = document.getElementById('loaderMsg');
+
+function setStatus(msg, cls = '') {
+  statusBar.textContent = msg;
+  statusBar.className = 'status-bar ' + cls;
+}
+
+let pyodide = null;
+
+async function init() {
+  try {
+    loaderMsg.textContent = 'Loading Pyodide runtime…';
+    pyodide = await loadPyodide();
+
+    loaderMsg.textContent = 'Installing numpy & scipy…';
+    await pyodide.loadPackage(['numpy', 'scipy']);
+
+    loaderMsg.textContent = 'Loading physics core…';
+    const resp = await fetch('focal_core.py');
+    const src  = await resp.text();
+    await pyodide.runPythonAsync(src);
+
+    loader.classList.add('hidden');
+    btnRun.disabled = false;
+    btnRun.textContent = 'Calculate';
+    setStatus('Ready.', 'ok');
+  } catch (err) {
+    loaderMsg.textContent = 'Error: ' + err.message;
+    setStatus('Initialisation failed: ' + err.message, 'error');
+  }
+}
+
+init();
+
+// ── Plot helper ───────────────────────────────────────────────────────────────
+const COLORSCALE = 'Jet';
+
+function renderHeatmap(elId, z2d, xArr, yArr, xLabel, yLabel) {
+  const data = [{
+    type: 'heatmap', z: z2d, x: xArr, y: yArr,
+    colorscale: COLORSCALE, showscale: true,
+    colorbar: { thickness: 10, len: 0.8, tickfont: { size: 9, color: '#94a3b8' } }
+  }];
+  const layout = {
+    paper_bgcolor: '#1e293b', plot_bgcolor: '#1e293b',
+    margin: { l: 46, r: 10, t: 6, b: 40 },
+    xaxis: { title: { text: xLabel, font: { size: 10, color: '#94a3b8' } },
+             tickfont: { size: 9, color: '#64748b' }, gridcolor: '#334155' },
+    yaxis: { title: { text: yLabel, font: { size: 10, color: '#94a3b8' } },
+             tickfont: { size: 9, color: '#64748b' }, gridcolor: '#334155',
+             scaleanchor: 'x', scaleratio: 1 },
+    font: { color: '#94a3b8' }
+  };
+  Plotly.react(elId, data, layout, { responsive: true, displayModeBar: false });
+}
+
+// ── Run calculation ───────────────────────────────────────────────────────────
+btnRun.addEventListener('click', async () => {
+  if (!pyodide) return;
+
+  btnRun.disabled = true;
+  btnRun.textContent = 'Calculating…';
+  setStatus('Running vectorial Debye integral…');
+  loader.classList.remove('hidden');
+  loaderMsg.textContent = 'Computing intensity distribution…';
+
+  const params = {
+    wl:          parseFloat(document.getElementById('wl').value)   * 1e-9,
+    NA:          parseFloat(document.getElementById('NA').value),
+    n:           parseFloat(document.getElementById('n').value),
+    m:           parseInt  (document.getElementById('m').value),
+    e:           parseFloat(document.getElementById('e').value),
+    z0:          parseFloat(document.getElementById('z0').value)        * 1e-6,
+    r_extent:    parseFloat(document.getElementById('r_extent').value)  * 1e-6,
+    z_extent:    parseFloat(document.getElementById('z_extent').value)  * 1e-6,
+    re:          parseInt  (document.getElementById('re').value),
+    polarization: document.getElementById('polarization').value,
+    plane:        document.getElementById('plane').value,
+  };
+
+  try {
+    // Pass params to Python and run
+    pyodide.globals.set('_p', params);
+    const result = await pyodide.runPythonAsync(`
+import json
+p = _p.to_py()
+res = compute_intensity(
+    wl=p['wl'], NA=p['NA'], n=p['n'], m=int(p['m']),
+    e=p['e'], z0=p['z0'], r_extent=p['r_extent'],
+    z_extent=p['z_extent'], re=int(p['re']),
+    polarization=p['polarization'], plane=p['plane']
+)
+json.dumps(res)
+`);
+    const r = JSON.parse(result);
+
+    const xl = r.x_label, yl = r.y_label;
+    renderHeatmap('plotI',  r.I,  r.x_axis, r.y_axis, xl, yl);
+    renderHeatmap('plotIx', r.Ix, r.x_axis, r.y_axis, xl, yl);
+    renderHeatmap('plotIy', r.Iy, r.x_axis, r.y_axis, xl, yl);
+    renderHeatmap('plotIz', r.Iz, r.x_axis, r.y_axis, xl, yl);
+
+    loader.classList.add('hidden');
+    setStatus('Done.', 'ok');
+  } catch (err) {
+    loader.classList.add('hidden');
+    setStatus('Error: ' + err.message, 'error');
+    console.error(err);
+  }
+
+  btnRun.disabled = false;
+  btnRun.textContent = 'Calculate';
+});
+</script>
+</body>
+</html>
