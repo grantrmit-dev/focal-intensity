@@ -1,0 +1,12 @@
+function cmap = ExtractColormap(level)
+im = flipud(imread('colorbar2.png'));
+R = imresize(double(im(:,1,1)),[level 1]);
+G = imresize(double(im(:,1,2)),[level 1]);
+B = imresize(double(im(:,1,3)),[level 1]);
+R = R./max(R);
+G = G./max(G);
+B = B./max(B);
+cmap =zeros(length(R),0);
+cmap(:,1) = R;
+cmap(:,2) = G;
+cmap(:,3) = B;
