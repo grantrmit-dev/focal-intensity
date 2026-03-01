@@ -14,7 +14,7 @@ def _integrate(f3d, th):
     return np.trapz(f3d, th, axis=0)
 
 
-def compute_intensity(wl, NA, n, m, e, z0, r_extent, z_extent, re, polarization, plane):
+def compute_intensity(wl, NA, n, m, e, z0, x_extent, y_extent, z_extent, re, polarization, plane):
     """
     Compute focal intensity distribution.
 
@@ -26,7 +26,8 @@ def compute_intensity(wl, NA, n, m, e, z0, r_extent, z_extent, re, polarization,
     m           : int    - topological charge (vortex phase); 0 = plane wave
     e           : float  - normalised inner radius of annular aperture (0=full)
     z0          : float  - axial position of image plane (m)
-    r_extent    : float  - half-width of XY calculation region (m)
+    x_extent    : float  - X half-width of calculation region (m)
+    y_extent    : float  - Y half-width of calculation region (m)
     z_extent    : float  - half-width of Z calculation region (m)
     re          : int    - grid resolution (pixels per side)
     polarization: str    - 'Linear'|'Circular'|'Radial'|'Azimuthal'
@@ -45,8 +46,8 @@ def compute_intensity(wl, NA, n, m, e, z0, r_extent, z_extent, re, polarization,
     th  = np.linspace(th1, a, N_TH)
 
     if plane == 'X-Y':
-        X = np.linspace(-r_extent, r_extent, re)
-        Y = np.linspace(-r_extent, r_extent, re)
+        X = np.linspace(-x_extent, x_extent, re)
+        Y = np.linspace(-y_extent, y_extent, re)
         xg, yg = np.meshgrid(X, Y)
         ang = np.arctan2(yg, xg)
         r   = np.sqrt(xg**2 + yg**2)
@@ -56,7 +57,7 @@ def compute_intensity(wl, NA, n, m, e, z0, r_extent, z_extent, re, polarization,
         res['x_label'] = 'X (λ)'
         res['y_label'] = 'Y (λ)'
     else:  # R-Z
-        R = np.linspace(-r_extent, r_extent, re)
+        R = np.linspace(-x_extent, x_extent, re)
         Z = np.linspace(-z_extent, z_extent, re)
         rg, zg = np.meshgrid(R, Z)
         res = _rz(polarization, th, k, n, m, rg, zg, ang=0.0)
